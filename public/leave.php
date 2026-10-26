@@ -1,0 +1,15 @@
+<?php
+$title='Leave Management'; require_once __DIR__.'/../partials/header.php';
+$db=new Database(); $c=$db->getConnection(); $employees=$c->query("SELECT id,employee_code,name FROM employees WHERE status='active' ORDER BY name")->fetch_all(MYSQLI_ASSOC); $m=new LeaveRequest($c); $error='';
+if($_SERVER['REQUEST_METHOD']==='POST'){
+    try {
+        verify_csrf($_POST['csrf_token']??null);
+        if(isset($_POST['action'])) { $m->status((int)$_POST['id'],(string)$_POST['action']); }
+        else { $m->create(['employee_id'=>(int)$_POST['employee_id'],'leave_type'=>$_POST['leave_type']??'','start_date'=>$_POST['start_date']??'','end_date'=>$_POST['end_date']??'','reason'=>trim($_POST['reason']??'')]); }
+        redirect('leave.php');
+    } catch(Throwable $e) { $error=$e->getMessage(); }
+}
+$rows=$m->all();
+?>
+<section class="panel"><?php if($error):?><div class="alert"><?=e($error)?></div><?php endif;?><div class="panel-head"><h2>Create Leave Request</h2></div><form method="post" class="form-grid"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><div class="field"><label>Employee</label><select class="select" name="employee_id" required><?php foreach($employees as $employee):?><option value="<?=$employee['id']?>"><?=e($employee['employee_code'].' — '.$employee['name'])?></option><?php endforeach;?></select></div><div class="field"><label>Leave Type</label><select class="select" name="leave_type"><option>casual</option><option>sick</option><option>earned</option><option>unpaid</option><option>other</option></select></div><div class="field"><label>Start Date</label><input class="input" type="date" name="start_date" required></div><div class="field"><label>End Date</label><input class="input" type="date" name="end_date" required></div><div class="field" style="grid-column:1/-1"><label>Reason</label><textarea class="textarea" name="reason" required></textarea></div><div><button class="btn btn-primary">Submit Request</button></div></form></section>
+<section class="panel"><div class="panel-head"><h2>Leave Requests</h2></div><div class="table-wrap"><table class="table"><thead><tr><th>Employee</th><th>Type</th><th>Period</th><th>Reason</th><th>Status</th><th>Action</th></tr></thead><tbody><?php foreach($rows as $r):?><tr><td><?=e($r['employee_code'].' — '.$r['name'])?></td><td><?=e($r['leave_type'])?></td><td><?=e($r['start_date'])?> → <?=e($r['end_date'])?></td><td><?=e($r['reason'])?></td><td><span class="badge <?=e($r['status'])?>"><?=e($r['status'])?></span></td><td><?php if($r['status']==='pending'):?><form method="post" class="actions"><input type="hidden" name="csrf_token" value="<?=e(csrf_token())?>"><input type="hidden" name="id" value="<?=$r['id']?>"><button name="action" value="approved" class="btn btn-primary">Approve</button><button name="action" value="rejected" class="btn btn-danger">Reject</button></form><?php endif;?></td></tr><?php endforeach;?></tbody></table></div></section><?php require_once __DIR__.'/../partials/footer.php'; ?>
